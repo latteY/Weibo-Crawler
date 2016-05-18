@@ -26,7 +26,6 @@ def crawler(url):
 
 # url = "http://weibo.cn/u/5110432155/"  #LXP
 #url = "http://weibo.cn/5110432155/fans"
-# url="http://www.zhihu.com/collection/27109279?page=1"
 
 # url="http://www.weibo.com"
 # url = "http://weibo.com/youaresucking?from=feed&loc=nickname"
