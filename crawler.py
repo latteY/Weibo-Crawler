@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import urllib2
 import sys
-from os import mkdir   #makedir
+import os
 from bs4 import BeautifulSoup
 
 ##craw the content of an URL,return string##
@@ -19,7 +19,29 @@ def crawler(url):
     soup = BeautifulSoup(page,'lxml')
 
     return soup
-    
+
+def extract_info(soup):
+    #从用户主页出发抽取用户的信息，soup为用户主页
+    user_profile=dict()  #存储用户资料的字典
+
+    # 找到“资料”的链接
+    body_tag = soup.body
+
+    for tag in body_tag.find_all('div'):
+        if tag['class'] == ['ut']:
+            for tag_in_div in tag.find_all('a'):
+                if tag_in_div.string and tag_in_div.string == u'资料':
+                    info_url = tag_in_div["href"]
+                    break
+            break
+
+    info_url='http://weibo.cn'+info_url
+    user_profile.setdefault('user_info_url',info_url)
+
+    info_soup=crawler(info_url)
+
+
+
 # user_agent = {'User-agent': 'spider'}
 # r = requests.get("http://weibo.com/u/5110432155?from=feed&loc=at&nick=%E6%9D%8E%E5%B0%8F%E9%B9%8F&is_all=1http://weibo.com/u/5110432155?from=feed&loc=at&nick=%E6%9D%8E%E5%B0%8F%E9%B9%8F&is_all=1",headers=user_agent)
 
@@ -34,10 +56,14 @@ def crawler(url):
 
 # url = "http://weibo.cn/1993545240" #bianbianyubaishui
 
-data_path="data/"  #set the path of the data
-mkdir(data_path)
+if not os.path.exists('data/'):
+    data_path="data/"         #set the path of the data
+    os.mkdir(data_path)
+else:
+    data_path="data/"
+
 nickname="leehom"
-mkdir(data_path+nickname)
+os.mkdir(data_path+nickname)
 
 url = "http://weibo.cn/leehom"
 
