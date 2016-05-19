@@ -39,8 +39,57 @@ def extract_info(soup):
     user_profile.setdefault('user_info_url',info_url)
 
     info_soup=crawler(info_url)
+    user_profile.setdefault('info_soup', info_soup)
 
+    #关注链接
+    follow_url = info_url.replace('info','follow')
+    follow_soup=crawler(follow_url)
+    user_profile.setdefault('follow_soup', follow_soup)
 
+    #粉丝连接
+    fans_url=info_url.replace('info','fans')
+    fans_soup=crawler(fans_url)
+    user_profile.setdefault('fans_soup', fans_soup)
+
+    #提取粉丝信息
+    body_tag = soup.body
+
+    for tag in body_tag.find_all('div'):
+        if tag['class'] == ['ut']:
+            for tag_in_div in tag.find_all('a'):
+                if tag_in_div.string and tag_in_div.string == u'资料':
+                    info_url = tag_in_div["href"]
+                    break
+            break
+
+    return user_profile
+
+def write2file(soup,name,mode='data',path='data/'):
+    '''soup是要写入文件的内容，name是文件名，path是文件写入路径（默认是：crawler.py所在
+    路径/data/),若不想选择默认路径，需要填绝对路径,若路径不存在会自动创建）
+    mode='data'时，识别文件名中包含的用户名并写入相应用户的文件夹'''
+    if not os.path.exists(path):
+        os.makedirs(path)     # make the directory of the data
+
+    if mode=='data':
+        if name.find('_')==-1:    #提取用户名,name中不包含“_”就返回-1
+            username = name.split('.')[0]
+        else:
+            username = name.split('_')[0]
+
+        if not os.path.exists(path+username):  #若某用户的文件夹不存在
+            os.makedirs(path+username)  # make the directory of the data
+
+        f = file(path + username + '/' + name, 'w+')
+
+        if type(soup) == type(BeautifulSoup('','lxml')):
+            text = (soup.prettify()).encode("utf-8")  # to UTF8
+    else:
+        f = file(path + '/' + name, 'w+')
+
+    f.write(text)
+    f.close()
+    # finish writing
 
 # user_agent = {'User-agent': 'spider'}
 # r = requests.get("http://weibo.com/u/5110432155?from=feed&loc=at&nick=%E6%9D%8E%E5%B0%8F%E9%B9%8F&is_all=1http://weibo.com/u/5110432155?from=feed&loc=at&nick=%E6%9D%8E%E5%B0%8F%E9%B9%8F&is_all=1",headers=user_agent)
@@ -56,60 +105,16 @@ def extract_info(soup):
 
 # url = "http://weibo.cn/1993545240" #bianbianyubaishui
 
-if not os.path.exists('data/'):
-    data_path="data/"         #set the path of the data
-    os.mkdir(data_path)
-else:
-    data_path="data/"
-
-nickname="leehom"
-os.mkdir(data_path+nickname)
-
 url = "http://weibo.cn/leehom"
 
 soup = crawler(url)
 
-#write to file
-f = file(data_path+nickname+'/'+'leehom.html', 'w+')   
-text = (soup.prettify()).encode("utf-8")   #to UTF8
-#f.write(soup.prettify())  # write HTML into File
-f.write(text)
-f.close()
-#finish the writing
+user_profile=dict()
+user_profile=extract_info(soup)
 
-body_tag = soup.body
+follow_soup = user_profile['follow_soup']
+fans_soup = user_profile['fans_soup']
 
-for tag in body_tag.find_all('div'):       #找到“资料”的链接
-    if tag['class'] == ['ut']:
-        for tag_in_div in tag.find_all('a'):
-            if tag_in_div.string and tag_in_div.string == u'资料':
-                info_url = tag_in_div["href"]
-                break
-        break
-
-info_url = 'http://weibo.cn'+info_url
-print info_url
-
-soup=crawler(info_url)
-
-#write to file
-f = file(data_path+nickname+'/'+'leehom_info.html', 'w+')
-text = (soup.prettify()).encode("utf-8")  # to UTF8
-# f.write(soup.prettify())  # write HTML into File
-f.write(text)
-f.close()
-#finish the writing
-
-
-
-
-'''
-request = urllib2.Request(url)
-request.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.2; rv:16.0) Gecko/20100101 Firefox/16.0')
-response = urllib2.urlopen(request)
-html = html.decode('utf-8','replace').encode(sys.getfilesystemencoding())
-print html
-'''
-
-
-
+write2file(soup,'leehom.html',mode='data')
+write2file(user_profile['fans_soup'],'leehom_fans.html',mode='data')
+write2file(user_profile['follow_soup'],'leehom_follow.html',mode='data')
