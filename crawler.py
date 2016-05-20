@@ -51,7 +51,7 @@ def extract_info(soup):
     fans_soup=crawler(fans_url)
     user_profile.setdefault('fans_soup', fans_soup)
 
-    #提取粉丝信息
+    #提取粉丝信息 extract user's profile link
     body_tag = soup.body
 
     for tag in body_tag.find_all('div'):
@@ -62,30 +62,50 @@ def extract_info(soup):
                     break
             break
 
+    #extract user's follow list
+    user_profile.setdefault('follow_list',list()) #construct data structure
+
+    body_tag = follow_soup.body
+
+    for table_tag in body_tag.find_all('table'):
+        for _tag in table_tag.find_all()
+        
+        if tag['class'] == ['ut']:
+            for tag_in_div in tag.find_all('a'):
+                if tag_in_div.string and tag_in_div.string == u'资料':
+                    info_url = tag_in_div["href"]
+                    break
+            break
+    
+    
     return user_profile
 
-def write2file(soup,name,mode='data',path='data/'):
+def write2file(soup,name,path='data/'):
     '''soup是要写入文件的内容，name是文件名，path是文件写入路径（默认是：crawler.py所在
-    路径/data/),若不想选择默认路径，需要填绝对路径,若路径不存在会自动创建）
+    路径/data/),mode='absolute_path'时需要填绝对路径,若路径不存在会自动创建）
     mode='data'时，识别文件名中包含的用户名并写入相应用户的文件夹'''
+
+    #check if has file 'data' in the dir,if not, add the file 'data'
+    if path.endswith('/data') or path.endswith('/data/'):  
+        pass
+    else:
+        path = path + '/data'
+    
     if not os.path.exists(path):
         os.makedirs(path)     # make the directory of the data
 
-    if mode=='data':
-        if name.find('_')==-1:    #提取用户名,name中不包含“_”就返回-1
-            username = name.split('.')[0]
-        else:
-            username = name.split('_')[0]
-
-        if not os.path.exists(path+username):  #若某用户的文件夹不存在
-            os.makedirs(path+username)  # make the directory of the data
-
-        f = file(path + username + '/' + name, 'w+')
-
-        if type(soup) == type(BeautifulSoup('','lxml')):
-            text = (soup.prettify()).encode("utf-8")  # to UTF8
+    if name.find('_')==-1:    #提取用户名,name中不包含“_”就返回-1
+        username = name.split('.')[0]
     else:
-        f = file(path + '/' + name, 'w+')
+        username = name.split('_')[0]
+
+    if not os.path.exists(path+'/'+username):  #若某用户的文件夹不存在
+        os.makedirs(path+'/'+username)  # make the directory of the data
+
+    f = file(path + '/' +username + '/' + name, 'w+')
+
+    if type(soup) == type(BeautifulSoup('','lxml')):
+        text = (soup.prettify()).encode("utf-8")  # to UTF8
 
     f.write(text)
     f.close()
@@ -114,7 +134,9 @@ user_profile=extract_info(soup)
 
 follow_soup = user_profile['follow_soup']
 fans_soup = user_profile['fans_soup']
+info_soup = user_profile['info_soup']
 
-write2file(soup,'leehom.html',mode='data')
-write2file(user_profile['fans_soup'],'leehom_fans.html',mode='data')
-write2file(user_profile['follow_soup'],'leehom_follow.html',mode='data')
+write2file(soup,'leehom.html',path='/home/ndscbigdata/')
+write2file(user_profile['fans_soup'],'leehom_fans.html',path='/home/ndscbigdata/')
+write2file(user_profile['follow_soup'],'leehom_follow.html',path='/home/ndscbigdata/')
+write2file(user_profile['info_soup'],'leehom_info.html',path='/home/ndscbigdata/')
