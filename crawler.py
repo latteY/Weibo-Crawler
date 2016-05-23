@@ -8,14 +8,16 @@ import threading
 import time
 from Queue import Queue
 
-##craw the content of an URL,return string##
-def crawler(url):
+lock = threading.RLock()  # 锁——用于需要原子操作的地方(可重入锁)
+
+def request_page(url):
+    '''craw the content of an URL,return soup object'''
     request = urllib2.Request(url)
     request.add_header('User-Agent', 'spider')
 
     # set cookie
-    request.add_header('cookie',
-                       '_T_WM=469be68685afe20cd84e2dbee27036c4;SUB=_2A256PQhUDeTxGeRK4lQZ9S3Kzz6IHXVZwagcrDV6PUJbrdANLRTNkW1LHetA_h_5TqgcJ-cblMBCRI9hhfy7ng..;gsid_CTandWM=4uud70dc1YC8ByW9oHxTPatxPam')
+    request.add_header('cookie','_T_WM=469be68685afe20cd84e2dbee27036c4;SUB=_2A256PQhUDeTxGeRK4lQZ9S3Kzz6IHXVZwagcrDV6PUJbrdANLRTNkW1LHetA_h_5TqgcJ-cblMBCRI9hhfy7ng..;gsid_CTandWM=4uud70dc1YC8ByW9oHxTPatxPam')
+    
     # return html of url
     page = urllib2.urlopen(request)
 
@@ -24,13 +26,17 @@ def crawler(url):
 
     return soup
 
-def extract_info(soup):
-    # 从用户主页出发抽取用户的信息，soup为用户主页
+def crawl(url):
+    # 从用户主页出发抽取用户的信息，url为用户主页
+    homepage = request_page(url)  #请求用户主页
+
     user_profile = dict()  # 存储用户资料的字典
+    user_profile.setdefault('homepage',homepage) #将首页信息写入字典
 
     # 找到“基本资料”的链接
-    body_tag = soup.body
+    body_tag = homepage.body
 
+    info_url=str()
     for tag in body_tag.find_all('div'):
         if tag['class'] == ['ut']:
             for tag_in_div in tag.find_all('a'):
@@ -40,46 +46,53 @@ def extract_info(soup):
             break
 
     info_url = 'http://weibo.cn' + info_url
+
     user_profile.setdefault('user_info_url', info_url)
 
-    info_soup = crawler(info_url)
+    info_soup = request_page(info_url)
     user_profile.setdefault('info_soup', info_soup)
 
-    #在资料页中中找出用户的昵称
-    username = info_soup.find_all(text=re.compile(u'昵称:')) #搜索含有"昵称:"的字符串
-    username = username[0].split(':')[1]    #将用户名存入username
+    '''
+    f=file('data/info.html','w+')
+    text = (info_soup.prettify()).encode("utf-8")
+    f.write(text)
+    f.close()
+    '''
+    # 在资料页中中找出用户的昵称
+    username = info_soup.find_all(text=re.compile(u'昵称:'))  # 搜索含有"昵称:"的字符串
+    username = username[0].split(':')[1]  # 将用户名存入username
+    testlist.append(username)
     user_profile.setdefault('username', username)
 
     # 关注链接
     follow_url = info_url.replace('info', 'follow')
-    follow_soup = crawler(follow_url)
+    follow_soup = request_page(follow_url)
     user_profile.setdefault('follow_soup', follow_soup)
 
     # 粉丝连接
     fans_url = info_url.replace('info', 'fans')
-    fans_soup = crawler(fans_url)
+    fans_soup = request_page(fans_url)
     user_profile.setdefault('fans_soup', fans_soup)
 
-    
     # 提取用户关注的人，将他们的URL通过list()存储
     user_profile.setdefault('follow_list', list())  # construct data structure
 
     body_tag = follow_soup.body
 
-    #暂时先爬一页的关注列表
-    for table_tag in body_tag.find_all('table',recursive=False):
+    # 暂时先爬一页的关注列表
+    for table_tag in body_tag.find_all('table', recursive=False):
         followlist = user_profile['follow_list']
-        followlist.append(table_tag.a['href'])   #list是可变对象所以，followlist变，user_profile['follow_list']也变
+        followlist.append(table_tag.a['href'])  # list是可变对象所以，followlist变，user_profile['follow_list']也变
 
     return user_profile
 
-def write2file(soup, name, path='data/'):
-    '''soup是要写入文件的内容，name是文件名，path是文件写入路径（默认是：crawler.py所在
+def write2file(object, path='data/'):
+    '''soup是要写入文件的内容，name是文件名，path是文件写入路径（默认是：request_page.py所在
     路径/data/),mode='absolute_path'时需要填绝对路径,若路径不存在会自动创建）
     mode='data'时，识别文件名中包含的用户名并写入相应用户的文件夹'''
 
     # check if has file 'data' in the dir,if not, add the file 'data'
-    if path =='data/':
+    if path == 'data/':
         pass
     else:
         path = path + '/data'
@@ -87,72 +100,96 @@ def write2file(soup, name, path='data/'):
     if not os.path.exists(path):
         os.makedirs(path)  # make the directory of the data
 
-    if name.find('_') == -1:  # 提取用户名,name中不包含“_”就返回-1
-        username = name.split('.')[0]
-    else:
-        username = name.split('_')[0]
+    if type(object) == type(dict()):
+        user_profile = object
+        username = user_profile['username']
 
-    if not os.path.exists(path + '/' + username):  # 若某用户的文件夹不存在
-        os.makedirs(path + '/' + username)  # make the directory of the data
+        if not os.path.exists(path + '/' + username):  # 若某用户的文件夹不存在
+            os.makedirs(path + '/' + username)  # make the directory of the data
 
-    f = file(path + '/' + username + '/' + name, 'w+')
+        FileNameList = ['homepage','fans_soup','follow_soup','info_soup']
 
-    if type(soup) == type(BeautifulSoup('', 'lxml')):
-        text = (soup.prettify()).encode("utf-8")  # to UTF8
+        for i in range(len(FileNameList)):
+            if user_profile.has_key(FileNameList[i]):
+                f = file(path + '/' + username + '/' + username+'_'+FileNameList[i].split('_')[0]+'.html', 'w+')
+                # if type(soup) == type(BeautifulSoup('', 'lxml')):
+                text = (user_profile[FileNameList[i]].prettify()).encode("utf-8")  # to UTF8
+                f.write(text)  #写文件
+                f.close()
+            else:
+                print FileNameList[i]+'is not in user_profile(user_profile is a dict)'
+        # finish writing
+    return
 
-    f.write(text)
-    f.close()
-    # finish writing
+class Crawler_Thread(threading.Thread):
+    def run(self):
+        global queue
+        global visited_url
+        global url_in_queue
 
-#class crawler_thread(threading.Thread):
+        while len(visited_url)<50:
+            print self.name + ' in....' + '\n'
+            #lock.acquire()
+            #print self.name + 'lock'+'\n'
+            url = queue.get()
+            visited_url.setdefault(url, '')
+            #lock.release()
 
-# user_agent = {'User-agent': 'spider'}
-# r = requests.get("http://weibo.com/u/5110432155?from=feed&loc=at&nick=%E6%9D%8E%E5%B0%8F%E9%B9%8F&is_all=1http://weibo.com/u/5110432155?from=feed&loc=at&nick=%E6%9D%8E%E5%B0%8F%E9%B9%8F&is_all=1",headers=user_agent)
+            user_profile = dict()  # 存放用户基本信息
+            user_profile = crawl(url)
 
+            Followlist = user_profile['follow_list']
 
-# url = "http://weibo.cn/u/5110432155/"  #LXP
-# url = "http://weibo.cn/5110432155/fans"
+            # lock.acquire()
+            for i in range(len(Followlist)):
+                if visited_url.has_key(Followlist[i]):
+                    lock.acquire()
+                    continue
+                if url_in_queue.has_key(Followlist[i]):
+                    continue
+                queue.put(Followlist[i])
+                url_in_queue.setdefault(Followlist[i], '')
+            # lock.release()
 
-# url="http://www.weibo.com"
-# url = "http://weibo.com/youaresucking?from=feed&loc=nickname"
-# url="https://cn.linkedin.com/in/kaifulee?trk=pub-pbmap"
-# url = "http://bl.ocks.org/mbostock/4063269"
+            write2file(user_profile)
+            print self.name + 'over' + '\n'
+            time.sleep(0.5)
+        #exit()
 
-# url = "http://weibo.cn/1993545240" #bianbianyubaishui
+#seed url
+seedurl = list()
+seedurl.append("http://weibo.cn/leehom")
+seedurl.append("http://weibo.cn/huangbo")
+seedurl.append("http://weibo.cn/kaifulee")
+seedurl.append("http://weibo.cn/guodegang")
+#url.append("http://weibo.cn/happyzhangjiang")
+seedurl.append("http://weibo.cn/jlin7")
 
-url = "http://weibo.cn/leehom"
-queue = Queue()                 #存放尚未被访问过的URL
+queue = Queue()  # 存放尚未被访问过的URL
+visited_url = dict()  # 存放已经被访问过的URL，用于快速查询
+url_in_queue = dict()  # 存放queue中URL，用于快速查询
 
-queue.put(url)
+testlist=list()
 
-for j in range(100):
-    url =  queue.get()
-    
-    soup = crawler(url)
+for i in range(len(seedurl)):
+    queue.put(seedurl[i])
 
-    user_profile = dict()
-    user_profile = extract_info(soup)
+for i in range(len(seedurl)):
+    url_in_queue.setdefault(seedurl[i], '')
 
-    follow_soup = user_profile['follow_soup']
-    fans_soup = user_profile['fans_soup']
-    info_soup = user_profile['info_soup']
-    username = user_profile['username']
+if __name__ == '__main__':
+    #create thread
 
-    write2file(soup, username+'.html')
-    write2file(soup, username+'.html')
-    write2file(user_profile['fans_soup'], username+'_fans.html')
-    write2file(user_profile['follow_soup'], username+'_follow.html')
-    write2file(user_profile['info_soup'], username+'_info.html')
+    for j in range(5):
+        t = Crawler_Thread()
+        t.start()
 
-    #将关注列表写入文件
-    '''
-    f=file('data/list.txt','w+')
-    for i in range(10):
-        f.write(user_profile['follow_list'][i]+'\n')
-    f.close()
-    '''
+    #print queue.qsize()
 
-    for i in range(len(user_profile['follow_list'])):
-        queue.put(user_profile['follow_list'][i])
-
-print queue.qsize()
+# 将关注列表写入文件
+'''
+f=file('data/list.txt','w+')
+for i in range(10):
+    f.write(user_profile['follow_list'][i]+'\n')
+f.close()
+'''
