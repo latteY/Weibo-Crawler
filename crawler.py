@@ -87,9 +87,8 @@ def crawl(url):
     return user_profile
 
 def write2file(object, path='data/'):
-    '''soup是要写入文件的内容，name是文件名，path是文件写入路径（默认是：request_page.py所在
-    路径/data/),mode='absolute_path'时需要填绝对路径,若路径不存在会自动创建）
-    mode='data'时，识别文件名中包含的用户名并写入相应用户的文件夹'''
+    '''object是存储用户信息的字典，path是文件写入路径（默认是：crawler.py所在
+    路径下的data文件夹),mode='absolute_path'时需要填绝对路径,若路径不存在会自动创建'''
 
     # check if has file 'data' in the dir,if not, add the file 'data'
     if path == 'data/':
@@ -129,27 +128,25 @@ class Crawler_Thread(threading.Thread):
 
         while len(visited_url)<50:
             print self.name + ' in....' + '\n'
-            #lock.acquire()
-            #print self.name + 'lock'+'\n'
+            lock.acquire()
             url = queue.get()
             visited_url.setdefault(url, '')
-            #lock.release()
+            lock.release()
 
             user_profile = dict()  # 存放用户基本信息
             user_profile = crawl(url)
 
             Followlist = user_profile['follow_list']
 
-            # lock.acquire()
+            lock.acquire()
             for i in range(len(Followlist)):
                 if visited_url.has_key(Followlist[i]):
-                    lock.acquire()
                     continue
                 if url_in_queue.has_key(Followlist[i]):
                     continue
                 queue.put(Followlist[i])
                 url_in_queue.setdefault(Followlist[i], '')
-            # lock.release()
+            lock.release()
 
             write2file(user_profile)
             print self.name + 'over' + '\n'
@@ -162,7 +159,7 @@ seedurl.append("http://weibo.cn/leehom")
 seedurl.append("http://weibo.cn/huangbo")
 seedurl.append("http://weibo.cn/kaifulee")
 seedurl.append("http://weibo.cn/guodegang")
-#url.append("http://weibo.cn/happyzhangjiang")
+seedurl.append("http://weibo.cn/happyzhangjiang")
 seedurl.append("http://weibo.cn/jlin7")
 
 queue = Queue()  # 存放尚未被访问过的URL
